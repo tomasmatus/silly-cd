@@ -45,7 +45,7 @@ class PodmanCD:
     def get_files_endswith(self, dir_name: str, suffix: str | tuple[str, ...]) -> list[str]:
         full_path = f"{self.work_dir}/{dir_name}"
         dir_content = os.listdir(full_path)
-        return [f"{self.work_dir}/{dir_name}/{f}" for f in dir_content if f.endswith(suffix)]
+        return [f"{full_path}/{f}" for f in dir_content if f.endswith(suffix)]
 
     def fetch_new_images(self, changed_dirs: list[DirChangeStatus]):
         images: list[str] = []
@@ -74,7 +74,7 @@ class PodmanCD:
             if len(kube_service) == 0:
                 continue
             else:
-                kube_service = kube_service[0].replace(".kube", ".service")
+                kube_service = os.path.basename(kube_service[0].replace(".kube", ".service"))
 
             if dir_change.status in [FileStatus.ADDED, FileStatus.MODIFIED]:
                 logger.info(f"Restarting kube {kube_service}")
