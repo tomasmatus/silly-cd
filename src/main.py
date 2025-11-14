@@ -3,6 +3,7 @@ import argparse
 import logging
 
 from gitforge import GitForge
+from podman_cd import PodmanCD
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -12,12 +13,8 @@ def main():
 
     args = parser.parse_args()
 
-    forge = GitForge(args.cwd)
-    changes = forge.find_changed_files("8c6c8e4b699919be6ef987a32e624304f24085e3", "HEAD")
-
-    for c in changes:
-        print(f"File: {c.file_name}, Status: {c.status.name}")
-
+    podmanCD = PodmanCD(args.cwd, True)
+    podmanCD.run_update()
 
 if __name__ == "__main__":
     main()

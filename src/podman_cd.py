@@ -9,22 +9,25 @@ from systemctl import Systemctl
 logger = logging.getLogger(__name__)
 
 class PodmanCD:
-    def __init__(self, work_dir: str):
+    def __init__(self, work_dir: str, user_mode: bool):
         self.work_dir = work_dir
         self.forge = GitForge(work_dir)
         self.podman = Podman()
-        self.systemctl = Systemctl(user_mode=True)
+        self.systemctl = Systemctl(user_mode=user_mode)
 
-    def check_for_updates(self):
+    def run_update(self):
         logger.info("Checking for updates...")
 
         old_hash = self.forge.latest_commit_hash()
         self.forge.git_pull()
-        changed_files = self.forge.find_changed_dirs(old_hash, "HEAD")
+        changed_dirs = self.forge.find_changed_dirs(old_hash, "HEAD")
 
-        if len(changed_files) == 0:
+        if len(changed_dirs) == 0:
             logger.info("No changes detected.")
             return
+
+        self.fetch_new_images(changed_dirs)
+        self.handle_services_lifecycle(changed_dirs)
 
     @staticmethod
     def parse_yaml_for_images(file_name: str) -> list[str]:
