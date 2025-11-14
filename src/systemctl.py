@@ -89,3 +89,7 @@ class Systemctl:
             return True
         except subprocess.CalledProcessError:
             return False
+
+    def daemon_reload(self, user: bool | None = None) -> str:
+        """Reload systemd manager configuration."""
+        return self.run_systemctl_command("daemon-reload", user=user)
