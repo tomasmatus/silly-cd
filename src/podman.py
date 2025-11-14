@@ -34,5 +34,5 @@ class Podman:
 
         return result.stdout.strip()
 
-    def podman_pull(self, image: str) -> str:
+    def pull(self, image: str) -> str:
         return self.run_podman_command("pull", image)
