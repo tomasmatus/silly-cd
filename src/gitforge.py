@@ -1,4 +1,5 @@
 import logging
+import os
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
@@ -20,6 +21,11 @@ class FileChangeStatus:
 
 class GitForge:
     def __init__(self, work_dir: str):
+        if not os.path.isdir(work_dir):
+            raise FileNotFoundError(f"Directory does not exist: {work_dir}")
+        if not os.path.exists(os.path.join(work_dir, '.git')):
+            raise FileNotFoundError(f"Not a git repository: {work_dir}")
+
         self.work_dir = work_dir
 
     def run_git_command(self, *args) -> str:
