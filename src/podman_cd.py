@@ -43,7 +43,8 @@ class PodmanCD:
         return images
 
     def get_files_endswith(self, dir_name: str, suffix: str | tuple[str, ...]) -> list[str]:
-        dir_content = os.listdir(dir_name)
+        full_path = f"{self.work_dir}/{dir_name}"
+        dir_content = os.listdir(full_path)
         return [f"{self.work_dir}/{dir_name}/{f}" for f in dir_content if f.endswith(suffix)]
 
     def fetch_new_images(self, changed_dirs: list[DirChangeStatus]):
