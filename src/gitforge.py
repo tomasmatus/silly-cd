@@ -15,8 +15,8 @@ class FileStatus(Enum):
     UNCHANGED = " "
 
 @dataclass
-class FileChangeStatus:
-    file_name: str
+class DirChangeStatus:
+    dir_name: str
     status: FileStatus
 
 class GitForge:
@@ -67,13 +67,13 @@ class GitForge:
     def latest_commit_hash(self) -> str:
         return self.run_git_command("rev-parse", "HEAD")
 
-    def find_changed_files(self, commit1: str, commit2: str = "HEAD") -> list[FileChangeStatus]:
+    def find_changed_dirs(self, commit1: str, commit2: str = "HEAD") -> list[DirChangeStatus]:
         diff_changed = self.git_diff_files_range(commit1, commit2)
 
         if not diff_changed:
             return []
 
-        changed_files = []
+        changed_dirs = []
         for line in diff_changed.splitlines():
             if not line.strip():
                 continue
@@ -84,12 +84,15 @@ class GitForge:
                 continue
 
             status_code = parts[0].strip()
-            file_name = parts[1].strip()
+            dir_name = os.path.dirname(parts[1].strip())
+
+            if dir_name == "":
+                continue
 
             try:
                 status = FileStatus(status_code)
-                changed_files.append(FileChangeStatus(file_name=file_name, status=status))
+                changed_dirs.append(DirChangeStatus(dir_name=dir_name, status=status))
             except ValueError:
-                raise ValueError(f"Unknown file status: {status_code} for file {file_name}")
+                raise ValueError(f"Unknown dir status: {status_code} for file {dir_name}")
 
-        return changed_files
+        return changed_dirs
