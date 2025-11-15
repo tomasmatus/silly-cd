@@ -19,6 +19,10 @@ class DirChangeStatus:
     dir_name: str
     status: FileStatus
 
+    def __hash__(self):
+        return hash(self.dir_name)
+
+
 class GitForge:
     def __init__(self, work_dir: str):
         if not os.path.isdir(work_dir):
