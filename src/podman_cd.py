@@ -47,7 +47,7 @@ class PodmanCD:
         dir_content = os.listdir(full_path)
         return [f"{full_path}/{f}" for f in dir_content if f.endswith(suffix)]
 
-    def fetch_new_images(self, changed_dirs: list[DirChangeStatus]):
+    def fetch_new_images(self, changed_dirs: set[DirChangeStatus]):
         images: list[str] = []
         for dir_change in changed_dirs:
             if dir_change.status not in [FileStatus.ADDED, FileStatus.MODIFIED]:
@@ -67,7 +67,7 @@ class PodmanCD:
                 logger.error(f"Failed to pull image {image}")
                 raise e
 
-    def handle_services_lifecycle(self , changed_dirs: list[DirChangeStatus]):
+    def handle_services_lifecycle(self, changed_dirs: set[DirChangeStatus]):
         self.systemctl.daemon_reload()
         for dir_change in changed_dirs:
             kube_service = self.get_files_endswith(dir_change.dir_name, (".kube"))

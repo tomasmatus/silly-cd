@@ -67,13 +67,13 @@ class GitForge:
     def latest_commit_hash(self) -> str:
         return self.run_git_command("rev-parse", "HEAD")
 
-    def find_changed_dirs(self, commit1: str, commit2: str = "HEAD") -> list[DirChangeStatus]:
+    def find_changed_dirs(self, commit1: str, commit2: str = "HEAD") -> set[DirChangeStatus]:
         diff_changed = self.git_diff_files_range(commit1, commit2)
 
+        changed_dirs: set[DirChangeStatus] = set()
         if not diff_changed:
-            return []
+            return changed_dirs
 
-        changed_dirs = []
         for line in diff_changed.splitlines():
             if not line.strip():
                 continue
@@ -91,7 +91,7 @@ class GitForge:
 
             try:
                 status = FileStatus(status_code)
-                changed_dirs.append(DirChangeStatus(dir_name=dir_name, status=status))
+                changed_dirs.add(DirChangeStatus(dir_name=dir_name, status=status))
             except ValueError:
                 raise ValueError(f"Unknown dir status: {status_code} for file {dir_name}")
 
