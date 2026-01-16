@@ -1,7 +1,7 @@
 import logging
 import os
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ class ChangedFile:
 @dataclass
 class ChangedDir:
     dirname: str
-    files: list[ChangedFile] = list()
+    files: list[ChangedFile] = field(default_factory=list)
     dir_status: DirStatus = DirStatus.UNDEFINED
 
     def __assess_status(self):
