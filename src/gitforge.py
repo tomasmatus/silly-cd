@@ -14,14 +14,34 @@ class FileStatus(Enum):
     COPIED = "C"
     UNCHANGED = " "
 
+class DirStatus(Enum):
+    UNDEFINED = "UNDEFINED"
+    MODIFIED = "MODIFIED"
+    DELETED = "DELETED"
+
 @dataclass
-class DirChangeStatus:
-    dir_name: str
+class ChangedFile:
+    filename: str
     status: FileStatus
 
-    def __hash__(self):
-        return hash(self.dir_name)
+@dataclass
+class ChangedDir:
+    dirname: str
+    files: list[ChangedFile] = list()
+    dir_status: DirStatus = DirStatus.UNDEFINED
 
+    def __assess_status(self):
+        if all(file.status == FileStatus.DELETED for file in self.files):
+            self.dir_status = DirStatus.DELETED
+            return
+
+        self.dir_status = DirStatus.MODIFIED
+
+class FileMap(dict[str, ChangedDir]):
+    def __missing__(self, key: str) -> ChangedDir:
+        new_dir = ChangedDir(dirname=key)
+        self[key] = new_dir
+        return new_dir
 
 class GitForge:
     def __init__(self, work_dir: str):
@@ -71,10 +91,10 @@ class GitForge:
     def latest_commit_hash(self) -> str:
         return self.run_git_command("rev-parse", "HEAD")
 
-    def find_changed_dirs(self, commit1: str, commit2: str = "HEAD") -> set[DirChangeStatus]:
+    def find_changed_dirs(self, commit1: str, commit2: str = "HEAD") -> FileMap:
         diff_changed = self.git_diff_files_range(commit1, commit2)
 
-        changed_dirs: set[DirChangeStatus] = set()
+        changed_dirs = FileMap()
         if not diff_changed:
             return changed_dirs
 
@@ -88,15 +108,19 @@ class GitForge:
                 continue
 
             status_code = parts[0].strip()
-            dir_name = os.path.dirname(parts[1].strip())
+            dirname = os.path.dirname(parts[1].strip())
+            filename = os.path.basename(parts[1].strip())
 
-            if dir_name == "":
+            if dirname == "":
                 continue
 
             try:
                 status = FileStatus(status_code)
-                changed_dirs.add(DirChangeStatus(dir_name=dir_name, status=status))
+                changed_dirs[dirname].files.append(ChangedFile(filename=filename, status=status))
             except ValueError:
-                raise ValueError(f"Unknown dir status: {status_code} for file {dir_name}")
+                raise ValueError(f"Unknown file status: {status_code} for file {dirname}/{filename}")
+
+        for dir in changed_dirs.values():
+            dir.__assess_status()
 
         return changed_dirs
