@@ -2,7 +2,6 @@
 import argparse
 import logging
 
-from gitforge import GitForge
 from podman_cd import PodmanCD
 
 logging.basicConfig(level=logging.DEBUG)

@@ -2,7 +2,7 @@ import logging
 import os
 import subprocess
 
-from gitforge import ChangedDir, ChangedFile, DirStatus, FileMap, FileStatus, GitForge
+from gitforge import ChangedDir, DirStatus, FileMap, FileStatus, GitForge
 from podman import Podman
 from systemctl import Systemctl
 
