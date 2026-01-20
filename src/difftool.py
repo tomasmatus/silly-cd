@@ -8,9 +8,10 @@ class ModificationStatus(Enum):
     DELETED = "DELETED"
 
 @dataclass
-class DirStatus:
+class DeploymentStatus:
     path: Path
     status: ModificationStatus
+    service_name: str | None
 
 class DiffTool:
     desired_dir: Path
@@ -39,8 +40,16 @@ class DiffTool:
         """
         return file.is_file() and not file.name.startswith(".")
 
-    def _check_modification(self, dirs: set[Path]) -> list[DirStatus]:
-        result: list[DirStatus] = []
+    @staticmethod
+    def get_service_name(dir: Path) -> str | None:
+        for file in dir.iterdir():
+            if file.is_file() and file.suffix == ".kube":
+                return file.stem + ".service"
+
+        return None
+
+    def _check_modification(self, dirs: set[Path]) -> list[DeploymentStatus]:
+        result: list[DeploymentStatus] = []
         for desired_subdir in dirs:
             deployed_subdir = self.deployed_dir / desired_subdir.name
 
@@ -65,10 +74,9 @@ class DiffTool:
 
             # Determine status
             if added_files or deleted_files or modified_files:
-                result.append(DirStatus(path=desired_subdir, status=ModificationStatus.MODIFIED))
+                result.append(DeploymentStatus(desired_subdir, ModificationStatus.MODIFIED, self.get_service_name(desired_subdir)))
 
         return result
-
 
     def list_deployment_differences(self):
         """
@@ -83,8 +91,8 @@ class DiffTool:
         added_dirs = desired_subdirs - deployed_subdirs
         other_dirs = desired_subdirs.intersection(deployed_subdirs)
 
-        dir_status = [DirStatus(path=dir, status=ModificationStatus.DELETED) for dir in deleted_dirs]
-        dir_status.extend([DirStatus(path=dir, status=ModificationStatus.ADDED) for dir in added_dirs])
+        dir_status = [DeploymentStatus(dir, ModificationStatus.DELETED, self.get_service_name(dir)) for dir in deleted_dirs]
+        dir_status.extend([DeploymentStatus(dir, ModificationStatus.ADDED, self.get_service_name(dir)) for dir in added_dirs])
         dir_status.extend(self._check_modification(other_dirs))
 
         return dir_status
