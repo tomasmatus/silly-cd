@@ -6,7 +6,6 @@ class ModificationStatus(Enum):
     ADDED = "ADDED"
     MODIFIED = "MODIFIED"
     DELETED = "DELETED"
-    UNCHANGED = "UNCHANGED"
 
 @dataclass
 class DirStatus:
@@ -67,8 +66,6 @@ class DiffTool:
             # Determine status
             if added_files or deleted_files or modified_files:
                 result.append(DirStatus(dirname=desired_subdir.name, status=ModificationStatus.MODIFIED))
-            else:
-                result.append(DirStatus(dirname=desired_subdir.name, status=ModificationStatus.UNCHANGED))
 
         return result
 
