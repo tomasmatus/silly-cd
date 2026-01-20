@@ -9,7 +9,7 @@ class ModificationStatus(Enum):
 
 @dataclass
 class DirStatus:
-    dirname: str
+    path: Path
     status: ModificationStatus
 
 class DiffTool:
@@ -65,7 +65,7 @@ class DiffTool:
 
             # Determine status
             if added_files or deleted_files or modified_files:
-                result.append(DirStatus(dirname=desired_subdir.name, status=ModificationStatus.MODIFIED))
+                result.append(DirStatus(path=desired_subdir, status=ModificationStatus.MODIFIED))
 
         return result
 
@@ -83,8 +83,8 @@ class DiffTool:
         added_dirs = desired_subdirs - deployed_subdirs
         other_dirs = desired_subdirs.intersection(deployed_subdirs)
 
-        dir_status = [DirStatus(dirname=dir.name, status=ModificationStatus.DELETED) for dir in deleted_dirs]
-        dir_status.extend([DirStatus(dirname=dir.name, status=ModificationStatus.ADDED) for dir in added_dirs])
+        dir_status = [DirStatus(path=dir, status=ModificationStatus.DELETED) for dir in deleted_dirs]
+        dir_status.extend([DirStatus(path=dir, status=ModificationStatus.ADDED) for dir in added_dirs])
         dir_status.extend(self._check_modification(other_dirs))
 
         return dir_status
