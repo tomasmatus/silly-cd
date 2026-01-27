@@ -38,7 +38,7 @@ class DiffTool:
         """
             Only consider directories that are not hidden.
         """
-        return file.is_file() and not file.name.startswith(".")
+        return file.is_dir() and not file.name.startswith(".")
 
     @staticmethod
     def get_service_name(dir: Path) -> str | None:
@@ -78,12 +78,10 @@ class DiffTool:
 
         return result
 
-    def list_deployment_differences(self):
+    def list_deployment_differences(self) -> list[DeploymentStatus]:
         """
             List modifications on top level subdirectories in deployed state
         """
-        # TODO: check for changed files, new files, deleted files
-
         desired_subdirs = set(f for f in self.desired_dir.iterdir() if self._dir_condition(f))
         deployed_subdirs = set(f for f in self.deployed_dir.iterdir() if self._dir_condition(f))
 
