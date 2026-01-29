@@ -1,5 +1,3 @@
-import shutil
-from typing import Generator
 import pytest
 import subprocess
 from pathlib import Path
@@ -8,49 +6,41 @@ from src.difftool import DiffTool, ModificationStatus
 
 SAMPLE_FILE_CONTENT = """This is a sample file :)"""
 
-@pytest.fixture(scope="session")
-def desired_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """Create a temporary directory for all tests in the session."""
-    tmpdir =  tmp_path_factory.mktemp("desired")
-    return tmpdir
-
-@pytest.fixture(scope="session")
-def deployed_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """Create a temporary directory for all tests in the session."""
-    tmpdir = tmp_path_factory.mktemp("deployed")
-    return tmpdir
-
 
 class TestDiff:
-    @pytest.fixture(scope="function", autouse=True)
-    def setup_tmpdirs(self, desired_dir: Path, deployed_dir: Path):
+    @pytest.fixture
+    def tmpdirs(self, tmp_path: Path) -> tuple[Path, Path]:
         """
             Initialize an empty git repository in desired_dir before running tests.
             Cleanup both directories after test finished.
         """
 
+        desired_dir = tmp_path / "desired"
+        desired_dir.mkdir()
         self.run_git(["init"], desired_dir)
-        yield
-        # Clean up both directories
-        subprocess.run(["rm", "-rf", str(desired_dir / "*")])
-        subprocess.run(["rm", "-rf", str(deployed_dir / "*")])
+
+        deployed_dir = tmp_path / "deployed"
+        deployed_dir.mkdir()
+
+        return (desired_dir, deployed_dir)
 
     @staticmethod
     def list_dir(dir_path: Path) -> None:
         print(subprocess.run(["ls", "-la", dir_path], capture_output=True, text=True).stdout)
 
-    def run_git(self, cmd: list[str], desired_dir: Path) -> subprocess.CompletedProcess:
-        return subprocess.run(["git"] + cmd, cwd=desired_dir, check=True, capture_output=True, text=True)
+    def run_git(self, cmd: list[str], cwd: Path) -> subprocess.CompletedProcess:
+        return subprocess.run(["git"] + cmd, cwd=cwd, check=True, capture_output=True, text=True)
 
     def write_file(self, file_path: Path, content: str) -> None:
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(content)
 
-    def git_add_file(self, filepath: Path, content: str, desired_dir: Path) -> None:
+    def git_add_file(self, filepath: Path, content: str, cwd: Path) -> None:
         self.write_file(filepath, content)
-        self.run_git(["add", str(filepath)], desired_dir)
+        self.run_git(["add", str(filepath)], cwd)
 
-    def test_add_service(self, desired_dir: Path, deployed_dir: Path):
+    def test_add_service(self, tmpdirs: tuple[Path, Path]):
+        desired_dir, deployed_dir = tmpdirs
         # add first service
         self.git_add_file(desired_dir / "service1" / "service1-kube.yaml", SAMPLE_FILE_CONTENT, desired_dir)
         self.git_add_file(desired_dir / "service1" / "service1-kube.kube", SAMPLE_FILE_CONTENT, desired_dir)
@@ -81,5 +71,6 @@ class TestDiff:
             expected_services.remove(change.service_name)
             assert change.status == ModificationStatus.ADDED
 
-    def test_vodes(self, desired_dir: Path, deployed_dir: Path):
+    def test_vodes(self, tmpdirs: tuple[Path, Path]):
+        desired_dir, deployed_dir = tmpdirs
         self.list_dir(desired_dir)
