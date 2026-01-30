@@ -1,5 +1,4 @@
 import logging
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -18,11 +17,12 @@ class PodmanCD:
         self.forge = GitForge(self.desired_dir)
         self.podman = Podman()
         self.systemctl = Systemctl(user_mode=user_mode)
+        self.diff_tool = DiffTool(self.desired_dir, self.deployed_dir)
 
     def run_update(self):
         logger.info("Checking for updates...")
 
-        changed_dirs = DiffTool(self.desired_dir, self.deployed_dir).list_deployment_differences()
+        changed_dirs = self.diff_tool.list_deployment_differences()
 
         if len(changed_dirs) == 0:
             logger.info("No changes detected.")
@@ -33,7 +33,7 @@ class PodmanCD:
             if dir.status in [ModificationStatus.ADDED, ModificationStatus.MODIFIED]:
                 self.fetch_images_in_kube(dir)
 
-        self.commit_changes(changed_dirs)
+        self.diff_tool.commit_changes(changed_dirs)
         self.handle_services_lifecycle(changed_dirs)
 
     @staticmethod
@@ -67,27 +67,6 @@ class PodmanCD:
             except subprocess.CalledProcessError as e:
                 logger.error(f"Failed to pull image {image}")
                 raise e
-
-    def commit_changes(self, changed_dirs: list[DeploymentStatus]):
-        """
-            Recursively copy files from desired directory to the deployed directory.
-        """
-
-        for dir_status in changed_dirs:
-            if dir_status.status in [ModificationStatus.ADDED, ModificationStatus.MODIFIED]:
-                source_dir = dir_status.path
-                dest_dir = self.deployed_dir / source_dir.name
-
-                # Recursively copy the directory
-                logger.info(f"Copying {source_dir} to {dest_dir}")
-                # Existing files will be overwritten
-                shutil.copytree(source_dir, dest_dir, dirs_exist_ok=True)
-
-            elif dir_status.status == ModificationStatus.DELETED:
-                dest_dir = self.deployed_dir / dir_status.path.name
-                if dest_dir.exists():
-                    logger.info(f"Removing {dest_dir}")
-                    shutil.rmtree(dest_dir)
 
     def handle_services_lifecycle(self, changed_dirs: list[DeploymentStatus]):
         self.systemctl.daemon_reload()
