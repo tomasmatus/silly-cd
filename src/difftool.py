@@ -44,9 +44,10 @@ class DiffTool:
         """
         return file.is_dir() and not file.name.startswith(".")
 
-    @staticmethod
-    def get_service_name(dir: Path) -> str | None:
-        for file in dir.iterdir():
+    def get_service_name(self, dir: Path) -> str | None:
+        # dir is relative to self.desired_dir
+        full_path = self.desired_dir / dir
+        for file in full_path.iterdir():
             if file.is_file() and file.suffix == ".kube":
                 return file.stem + ".service"
 
@@ -54,18 +55,18 @@ class DiffTool:
 
     def _check_modification(self, dirs: set[Path]) -> list[DeploymentStatus]:
         result: list[DeploymentStatus] = []
-        for desired_subdir in dirs:
-            deployed_subdir = self.deployed_dir / desired_subdir.name
+        for dir in dirs:
+            desired_subdir = self.desired_dir / dir
+            deployed_subdir = self.deployed_dir / dir
 
             # Get all files recursively in both subdirectories (using relative paths)
             desired_files = {f.relative_to(desired_subdir) for f in desired_subdir.rglob('*') if self._file_condition(f)}
             deployed_files = {f.relative_to(deployed_subdir) for f in deployed_subdir.rglob('*') if self._file_condition(f)}
 
-            # Check for added or deleted files
             added_files = desired_files - deployed_files
             deleted_files = deployed_files - desired_files
 
-            # Check for modified files (files that exist in both)
+            # Check for modified files
             common_files = desired_files.intersection(deployed_files)
 
             modified_files = set()
@@ -76,9 +77,10 @@ class DiffTool:
                 if desired_file.read_bytes() != deployed_file.read_bytes():
                     modified_files.add(file)
 
-            # Determine status
+            # Mark directory as modified if there are any changes, during commit the original subdir is deleted
             if added_files or deleted_files or modified_files:
-                result.append(DeploymentStatus(desired_subdir, ModificationStatus.MODIFIED, self.get_service_name(desired_subdir)))
+                # store the relative path
+                result.append(DeploymentStatus(dir, ModificationStatus.MODIFIED, self.get_service_name(desired_subdir)))
 
         return result
 
@@ -86,8 +88,8 @@ class DiffTool:
         """
             List modifications on top level subdirectories in deployed state
         """
-        desired_subdirs = set(f for f in self.desired_dir.iterdir() if self._dir_condition(f))
-        deployed_subdirs = set(f for f in self.deployed_dir.iterdir() if self._dir_condition(f))
+        desired_subdirs = set(f.relative_to(self.desired_dir) for f in self.desired_dir.iterdir() if self._dir_condition(f))
+        deployed_subdirs = set(f.relative_to(self.deployed_dir) for f in self.deployed_dir.iterdir() if self._dir_condition(f))
 
         deleted_dirs = deployed_subdirs - desired_subdirs
         added_dirs = desired_subdirs - deployed_subdirs
@@ -102,20 +104,24 @@ class DiffTool:
     def commit_changes(self, changed_dirs: list[DeploymentStatus]):
         """
             Recursively copy files from desired directory to the deployed directory.
+
+            @param changed_dirs: List of DeploymentStatus, path is relative to self.desired_dir
         """
 
         for dir_status in changed_dirs:
             if dir_status.status in [ModificationStatus.ADDED, ModificationStatus.MODIFIED]:
-                source_dir = dir_status.path
-                dest_dir = self.deployed_dir / source_dir.name
+                src_dir = self.desired_dir / dir_status.path
+                dst_dir = self.deployed_dir / dir_status.path
 
-                # Recursively copy the directory
-                logger.info(f"Copying {source_dir} to {dest_dir}")
-                # Existing files will be overwritten
-                shutil.copytree(source_dir, dest_dir, dirs_exist_ok=True)
+                # Delete the current deployed dir and replace it with a new one
+                logger.info(f"Copying {src_dir} to {dst_dir}")
+                if dst_dir.exists():
+                    shutil.rmtree(dst_dir)
+
+                shutil.copytree(src_dir, dst_dir, dirs_exist_ok=True)
 
             elif dir_status.status == ModificationStatus.DELETED:
-                dest_dir = self.deployed_dir / dir_status.path.name
-                if dest_dir.exists():
-                    logger.info(f"Removing {dest_dir}")
-                    shutil.rmtree(dest_dir)
+                dst_dir = self.deployed_dir / dir_status.path.name
+                if dst_dir.exists():
+                    logger.info(f"Removing {dst_dir}")
+                    shutil.rmtree(dst_dir)
