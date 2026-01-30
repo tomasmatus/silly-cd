@@ -1,6 +1,10 @@
+import logging
+import shutil
 from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 class ModificationStatus(Enum):
     ADDED = "ADDED"
@@ -94,3 +98,24 @@ class DiffTool:
         dir_status.extend(self._check_modification(other_dirs))
 
         return dir_status
+
+    def commit_changes(self, changed_dirs: list[DeploymentStatus]):
+        """
+            Recursively copy files from desired directory to the deployed directory.
+        """
+
+        for dir_status in changed_dirs:
+            if dir_status.status in [ModificationStatus.ADDED, ModificationStatus.MODIFIED]:
+                source_dir = dir_status.path
+                dest_dir = self.deployed_dir / source_dir.name
+
+                # Recursively copy the directory
+                logger.info(f"Copying {source_dir} to {dest_dir}")
+                # Existing files will be overwritten
+                shutil.copytree(source_dir, dest_dir, dirs_exist_ok=True)
+
+            elif dir_status.status == ModificationStatus.DELETED:
+                dest_dir = self.deployed_dir / dir_status.path.name
+                if dest_dir.exists():
+                    logger.info(f"Removing {dest_dir}")
+                    shutil.rmtree(dest_dir)
