@@ -44,9 +44,9 @@ class DiffTool:
         """
         return file.is_dir() and not file.name.startswith(".")
 
-    def get_service_name(self, dir: Path) -> str | None:
+    def get_service_name(self, dir: Path, is_deleted: bool = False) -> str | None:
         # dir is relative to self.desired_dir
-        full_path = self.desired_dir / dir
+        full_path = self.desired_dir / dir if is_deleted is False else self.deployed_dir / dir
         for file in full_path.iterdir():
             if file.is_file() and file.suffix == ".kube":
                 return file.stem + ".service"
@@ -95,7 +95,7 @@ class DiffTool:
         added_dirs = desired_subdirs - deployed_subdirs
         other_dirs = desired_subdirs.intersection(deployed_subdirs)
 
-        dir_status = [DeploymentStatus(dir, ModificationStatus.DELETED, self.get_service_name(dir)) for dir in deleted_dirs]
+        dir_status = [DeploymentStatus(dir, ModificationStatus.DELETED, self.get_service_name(dir, is_deleted=True)) for dir in deleted_dirs]
         dir_status.extend([DeploymentStatus(dir, ModificationStatus.ADDED, self.get_service_name(dir)) for dir in added_dirs])
         dir_status.extend(self._check_modification(other_dirs))
 
@@ -121,7 +121,7 @@ class DiffTool:
                 shutil.copytree(src_dir, dst_dir, dirs_exist_ok=True)
 
             elif dir_status.status == ModificationStatus.DELETED:
-                dst_dir = self.deployed_dir / dir_status.path.name
+                dst_dir = self.deployed_dir / dir_status.path
                 if dst_dir.exists():
                     logger.info(f"Removing {dst_dir}")
                     shutil.rmtree(dst_dir)
