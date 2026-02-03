@@ -55,7 +55,7 @@ class PodmanCD:
         """
 
         images: set[str] = set()
-        for file in dir.path.iterdir():
+        for file in (self.desired_dir / dir.path).iterdir():
             if file.is_file() and file.name.endswith((".yml", ".yaml")):
                 images.union(self._parse_yaml_for_images(file))
 
