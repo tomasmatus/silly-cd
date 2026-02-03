@@ -76,19 +76,15 @@ class Systemctl:
 
     def is_active(self, service: str, user: bool | None = None) -> bool:
         """Check if a service is active."""
-        try:
-            self.run_systemctl_command("is-active", service, user=user)
-            return True
-        except subprocess.CalledProcessError:
-            return False
+        ret = self.run_systemctl_command("is-active", service, user=user)
+
+        return ret == "active"
 
     def is_enabled(self, service: str, user: bool | None = None) -> bool:
         """Check if a service is enabled."""
-        try:
-            self.run_systemctl_command("is-enabled", service, user=user)
-            return True
-        except subprocess.CalledProcessError:
-            return False
+        ret = self.run_systemctl_command("is-enabled", service, user=user)
+
+        return ret == "enabled"
 
     def daemon_reload(self, user: bool | None = None) -> str:
         """Reload systemd manager configuration."""
