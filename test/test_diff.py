@@ -3,7 +3,7 @@ import pytest
 import subprocess
 from pathlib import Path
 
-from src.difftool import DeploymentStatus, DiffTool, ModificationStatus
+from difftool import DeploymentStatus, DiffTool, ModificationStatus
 
 SAMPLE_FILE_CONTENT = """This is a sample file :)"""
 DIFFERENT_FILE_CONTENT = """This file has different content :o"""
