@@ -137,8 +137,6 @@ class TestPodmanCD:
             Fixture to automatically clean up created services
         """
 
-        created_services = []
-
         def _add_service(dir: Path, name: str) -> None:
             # create service directory and files
             service_dir = dir / name
@@ -150,21 +148,28 @@ class TestPodmanCD:
             kube_file = service_dir / f"{name}.kube"
             kube_file.write_text(kube_file_content(name))
 
-            # register service name
-            created_services.append(name)
-
         yield _add_service
 
-        # stop all services
-        # files are cleaned up in deployed_dir fixture
-        for name in created_services:
-            self.systemctl.stop(f"{name}.service")
+        # stop all leftover services in deployed_dir
+        # name of the service is the same as directory name
+        # TODO: this can probably be done async to reduce cleanup time
+        for dirname in self.deployed_dir.iterdir():
+            if dirname.is_dir():
+                self.systemctl.stop(f"{dirname.name}.service")
 
     def test_add_container(self, desired_dir: Path, add_service: ServiceFactory) -> None:
-        add_service(desired_dir, "fancy")
-
         podman_cd = PodmanCD(str(desired_dir), str(self.deployed_dir), True)
+
+        add_service(desired_dir, "fancy")
         podman_cd.run_update()
 
         wait_service_active("fancy.service", self.systemctl)
         wait_container_running("fancy-pod-fancy", timeout=10)
+
+        # add two more
+        add_service(desired_dir, "fancier")
+        add_service(desired_dir, "fanciest")
+
+        podman_cd.run_update()
+        wait_container_running("fancier-pod-fancier", timeout=10)
+        wait_container_running("fanciest-pod-fanciest", timeout=10)
