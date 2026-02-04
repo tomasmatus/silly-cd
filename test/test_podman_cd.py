@@ -1,11 +1,14 @@
 import shutil
-from typing import Callable, Generator
+import time
 import pytest
 import subprocess
 from pathlib import Path
+from typing import Callable, Generator, TypeVar
 
 from podman_cd import PodmanCD
 from systemctl import Systemctl
+
+TEST_CONTAINER_IMAGE = "docker.io/library/alpine:latest"
 
 def kube_yaml_content(name: str) -> str:
     return f"""apiVersion: apps/v1
@@ -23,7 +26,7 @@ spec:
     spec:
       containers:
       - name: {name}
-        image: docker.io/library/alpine:latest
+        image: {TEST_CONTAINER_IMAGE}
         command: ["sleep", "infinity"]
 """
 
@@ -37,13 +40,70 @@ WantedBy=default.target
 
 type ServiceFactory = Callable[[Path, str], None]
 
+class Error(Exception):
+    def __init__(self, msg: str) -> None:
+        self.msg = msg
+
+    def __str__(self) -> str:
+        return self.msg
+
+_T = TypeVar("_T")
+
+def run_subprocess(cmd: list[str]) -> tuple[str, int]:
+    ret = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    return (ret.stdout.strip(), ret.returncode)
+
+def wait(func: Callable[[], _T | None], *, timeout: int = 5, err_msg: str | None = None) -> _T:
+    """
+        Repeatedly call func until it returns a truthy value or timeout is reached.
+
+        @param func: Function to call
+        @param timeout: Number of seconds to wait (default is 5 seconds)
+
+        @raises Error: If timeout is reached
+
+    """
+
+    for _ in range(timeout * 5):
+        val = func()
+        if val:
+            return val
+        time.sleep(0.2)
+
+    raise Error(err_msg or "Time out waiting for predicate to become true")
+
+def wait_service_active(name: str, systemctl: Systemctl, *, timeout: int = 5) -> None:
+    """
+        Wait until the given service is active
+
+        @param systemctl: Systemctl instance to use
+        @param name: Name of the service
+        @param timeout: Number of seconds to wait (default is 5 seconds)
+
+        @raises Error: If timeout is reached
+    """
+
+    if not name.endswith(".service"):
+        name += ".service"
+
+    wait(lambda: systemctl.is_active(name), timeout=timeout,
+         err_msg=f"Service {name} did not become active")
+
+def wait_container_running(name: str, *, timeout: int = 5) -> None:
+    def _check_podman_ps():
+        out, _ = run_subprocess(["podman", "ps", "--format", "{{.Names}}"])
+
+        return name in out.splitlines()
+
+    wait(_check_podman_ps, err_msg=f"Container {name} did not start running", timeout=timeout)
+
+@pytest.fixture(scope="session", autouse=True)
+def prefetch_test_image():
+    run_subprocess(["podman", "pull", "--policy", "missing", TEST_CONTAINER_IMAGE])
 
 class TestPodmanCD:
     deployed_dir: Path = Path("~/.config/containers/systemd/pytests_deployed").expanduser()
     systemctl: Systemctl = Systemctl(user_mode=True)
-
-    def check_service_active(self, name: str) -> bool:
-        return self.systemctl.is_active(f"{name}.service")
 
     @pytest.fixture(autouse=True)
     def setup_deployed_dir(self):
@@ -101,8 +161,10 @@ class TestPodmanCD:
             self.systemctl.stop(f"{name}.service")
 
     def test_add_container(self, desired_dir: Path, add_service: ServiceFactory) -> None:
-        add_service(desired_dir, "fancy-service")
-        add_service(desired_dir, "second-service")
+        add_service(desired_dir, "fancy")
 
         podman_cd = PodmanCD(str(desired_dir), str(self.deployed_dir), True)
         podman_cd.run_update()
+
+        wait_service_active("fancy.service", self.systemctl)
+        wait_container_running("fancy-pod-fancy", timeout=10)
