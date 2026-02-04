@@ -1,5 +1,5 @@
 import shutil
-from typing import Callable
+from typing import Callable, Generator
 import pytest
 import subprocess
 from pathlib import Path
@@ -24,7 +24,7 @@ spec:
       containers:
       - name: {name}
         image: docker.io/library/alpine:latest
-        command: ["sh"]
+        command: ["sleep", "infinity"]
 """
 
 def kube_file_content(name: str) -> str:
@@ -58,7 +58,7 @@ class TestPodmanCD:
 
         yield
 
-        self.deployed_dir.rmdir()
+        shutil.rmtree(self.deployed_dir)
         self.systemctl.daemon_reload()
 
     @pytest.fixture
@@ -72,10 +72,12 @@ class TestPodmanCD:
         return tmp_path
 
     @pytest.fixture
-    def add_service(self, request) -> ServiceFactory:
+    def add_service(self) -> Generator[ServiceFactory]:
         """
             Fixture to automatically clean up created services
         """
+
+        created_services = []
 
         def _add_service(dir: Path, name: str) -> None:
             # create service directory and files
@@ -88,14 +90,15 @@ class TestPodmanCD:
             kube_file = service_dir / f"{name}.kube"
             kube_file.write_text(kube_file_content(name))
 
-            # register a cleanup function
-            def _service_cleanup():
-                self.systemctl.stop(f"{name}.service")
-                shutil.rmtree(service_dir)
+            # register service name
+            created_services.append(name)
 
-            request.addfinalizer(_service_cleanup)
+        yield _add_service
 
-        return _add_service
+        # stop all services
+        # files are cleaned up in deployed_dir fixture
+        for name in created_services:
+            self.systemctl.stop(f"{name}.service")
 
     def test_add_container(self, desired_dir: Path, add_service: ServiceFactory) -> None:
         add_service(desired_dir, "fancy-service")
