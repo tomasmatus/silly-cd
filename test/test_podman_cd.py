@@ -5,8 +5,8 @@ import subprocess
 from pathlib import Path
 from typing import Callable, Generator, TypeVar
 
-from podman_cd import PodmanCD
-from systemctl import Systemctl
+from src.podman_cd import PodmanCD
+from src.systemctl import Systemctl
 
 TEST_CONTAINER_IMAGE = "docker.io/library/alpine:latest"
 
