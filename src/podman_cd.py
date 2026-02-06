@@ -2,10 +2,10 @@ import logging
 import subprocess
 from pathlib import Path
 
-from difftool import DiffTool, DeploymentStatus, ModificationStatus
-from gitforge import GitForge
-from podman import Podman
-from systemctl import Systemctl
+from .difftool import DiffTool, DeploymentStatus, ModificationStatus
+from .gitforge import GitForge
+from .podman import Podman
+from .systemctl import Systemctl
 
 logger = logging.getLogger(__name__)
 
