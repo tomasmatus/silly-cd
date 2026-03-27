@@ -2,7 +2,7 @@
 import argparse
 import logging
 
-from podman_cd import PodmanCD
+from .podman_cd import PodmanCD
 
 logging.basicConfig(level=logging.DEBUG)
 
