@@ -33,7 +33,6 @@ class PodmanCD:
             if dir.status in [ModificationStatus.ADDED, ModificationStatus.MODIFIED]:
                 self.fetch_images_in_kube(dir)
 
-        self.diff_tool.commit_changes(changed_dirs)
         self.handle_services_lifecycle(changed_dirs)
 
     @staticmethod
@@ -69,6 +68,17 @@ class PodmanCD:
                 raise e
 
     def handle_services_lifecycle(self, changed_dirs: list[DeploymentStatus]):
+        # first stop all deleted services
+        for dir in changed_dirs:
+            if dir.service_name is None:
+                logger.warning(f"No kube service found for {dir.path}, skipping lifecycle management!")
+                continue
+
+            if dir.status == ModificationStatus.DELETED:
+                self.systemctl.stop(dir.service_name)
+
+        # commit changes to deployed_dir and perform daemon-reload to sync changes into systemd
+        self.diff_tool.commit_changes(changed_dirs)
         self.systemctl.daemon_reload()
 
         for dir in changed_dirs:
@@ -80,9 +90,6 @@ class PodmanCD:
                 logger.info(f"Restarting kube {dir.service_name}")
                 # restart the service, if it is not running it will be started
                 self.systemctl.restart(dir.service_name)
-
-            elif dir.status == ModificationStatus.DELETED:
-                self.systemctl.stop(dir.service_name)
 
             else:
                 logger.warning(f"Unsupported file status: {dir.status} for {dir.path}, not doing anything!")
