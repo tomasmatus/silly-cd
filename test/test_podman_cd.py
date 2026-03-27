@@ -1,3 +1,4 @@
+import logging
 import shutil
 import time
 import pytest
@@ -7,6 +8,8 @@ from typing import Callable, Generator, TypeVar
 
 from src.podman_cd import PodmanCD
 from src.systemctl import Systemctl
+
+logging.basicConfig(level=logging.DEBUG)
 
 TEST_CONTAINER_IMAGE = "docker.io/library/alpine:latest"
 
@@ -97,6 +100,15 @@ def wait_container_running(name: str, *, timeout: int = 5) -> None:
 
     wait(_check_podman_ps, err_msg=f"Container {name} did not start running", timeout=timeout)
 
+def wait_container_doesnt_exist(name: str, *, timeout: int = 5) -> None:
+    def _check_podman_ps():
+        out, _ = run_subprocess(["podman", "ps", "-a", "--format", "{{.Names}}"])
+
+        return name not in out.splitlines()
+
+    wait(_check_podman_ps, err_msg=f"Container {name} is still present!", timeout=timeout)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def prefetch_test_image():
     run_subprocess(["podman", "pull", "--policy", "missing", TEST_CONTAINER_IMAGE])
@@ -104,6 +116,13 @@ def prefetch_test_image():
 class TestPodmanCD:
     deployed_dir: Path = Path("~/.config/containers/systemd/pytests_deployed").expanduser()
     systemctl: Systemctl = Systemctl(user_mode=True)
+
+    @staticmethod
+    def remove_service(dir: Path, name: str) -> None:
+        """
+            Remove subdirectory of a given service from desired_dir
+        """
+        shutil.rmtree(dir / name)
 
     @pytest.fixture(autouse=True)
     def setup_deployed_dir(self):
@@ -157,7 +176,7 @@ class TestPodmanCD:
             if dirname.is_dir():
                 self.systemctl.stop(f"{dirname.name}.service")
 
-    def test_add_container(self, desired_dir: Path, add_service: ServiceFactory) -> None:
+    def test_add_remove_container(self, desired_dir: Path, add_service: ServiceFactory) -> None:
         podman_cd = PodmanCD(str(desired_dir), str(self.deployed_dir), True)
 
         add_service(desired_dir, "fancy")
@@ -173,3 +192,10 @@ class TestPodmanCD:
         podman_cd.run_update()
         wait_container_running("fancier-pod-fancier", timeout=10)
         wait_container_running("fanciest-pod-fanciest", timeout=10)
+
+        # remove fanciest container
+        self.remove_service(desired_dir, "fanciest")
+
+        podman_cd.run_update()
+
+        wait_container_doesnt_exist("fanciest-pod-fanciest", timeout=20)
