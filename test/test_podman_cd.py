@@ -119,8 +119,10 @@ def check_container_version(name: str, expected_ver: str) -> None:
 
 
 @pytest.fixture(scope="session", autouse=True)
-def prefetch_test_image():
-    run_subprocess(["podman", "pull", "--policy", "missing", TEST_CONTAINER_IMAGE])
+def prepare_test_image():
+    run_subprocess(["podman", "pull", "--policy", "missing", "docker.io/library/alpine:latest"])
+    run_subprocess(["podman", "tag", "docker.io/library/alpine:latest", TEST_CONTAINER_IMAGE])
+    run_subprocess(["podman", "tag", "docker.io/library/alpine:latest", ALT_TEST_CONTAINER_IMAGE])
 
 class TestPodmanCD:
     deployed_dir: Path = Path("~/.config/containers/systemd/pytests_deployed").expanduser()
