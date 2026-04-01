@@ -160,7 +160,7 @@ class TestPodmanCD:
         return tmp_path
 
     @pytest.fixture
-    def add_service(self) -> Generator[ServiceFactory]:
+    def add_service(self) -> Generator[ServiceFactory, None, None]:
         """
             Fixture to automatically clean up created services
         """
