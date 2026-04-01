@@ -11,9 +11,10 @@ from src.systemctl import Systemctl
 
 logging.basicConfig(level=logging.DEBUG)
 
-TEST_CONTAINER_IMAGE = "docker.io/library/alpine:latest"
+TEST_CONTAINER_IMAGE = "localhost/alpine:6"
+ALT_TEST_CONTAINER_IMAGE = "localhost/alpine:7"
 
-def kube_yaml_content(name: str) -> str:
+def kube_yaml_content(name: str, *, image_name: str = TEST_CONTAINER_IMAGE) -> str:
     return f"""apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,7 +30,7 @@ spec:
     spec:
       containers:
       - name: {name}
-        image: {TEST_CONTAINER_IMAGE}
+        image: {image_name}
         command: ["sleep", "infinity"]
 """
 
@@ -108,6 +109,14 @@ def wait_container_doesnt_exist(name: str, *, timeout: int = 5) -> None:
 
     wait(_check_podman_ps, err_msg=f"Container {name} is still present!", timeout=timeout)
 
+def check_container_version(name: str, expected_ver: str) -> None:
+    ver, _ = run_subprocess(["podman", "inspect", name, "--format", "{{.ImageName}}"])
+    ver = ver.split(":")[-1]
+    if ver == expected_ver:
+        return
+
+    raise Error(f"Container version did not match expected version. Expected: {expected_ver}, got: {ver}")
+
 
 @pytest.fixture(scope="session", autouse=True)
 def prefetch_test_image():
@@ -176,6 +185,13 @@ class TestPodmanCD:
             if dirname.is_dir():
                 self.systemctl.stop(f"{dirname.name}.service")
 
+    @staticmethod
+    def modify_file(file: Path, new_conent: str):
+        if not file.is_file():
+            raise FileNotFoundError("modify_file only allows modifying existing files")
+
+        file.write_text(new_conent)
+
     def test_add_remove_container(self, desired_dir: Path, add_service: ServiceFactory) -> None:
         podman_cd = PodmanCD(str(desired_dir), str(self.deployed_dir), True)
 
@@ -199,3 +215,21 @@ class TestPodmanCD:
         podman_cd.run_update()
 
         wait_container_doesnt_exist("fanciest-pod-fanciest", timeout=20)
+
+    def test_add_modify_container(self, desired_dir: Path, add_service: ServiceFactory) -> None:
+        podman_cd = PodmanCD(str(desired_dir), str(self.deployed_dir), True)
+
+        container_name = "jellyfin-pod-jellyfin"
+        add_service(desired_dir, "jellyfin")
+        podman_cd.run_update()
+        wait_service_active("jellyfin.service", self.systemctl)
+        wait_container_running(container_name, timeout=10)
+        check_container_version(container_name, "6")
+
+        # Modify container image
+        self.modify_file(desired_dir / "jellyfin" / "jellyfin.yaml",
+                         kube_yaml_content("jellyfin", image_name=ALT_TEST_CONTAINER_IMAGE))
+        podman_cd.run_update()
+        wait_service_active("jellyfin.service", self.systemctl)
+        wait_container_running(container_name, timeout=10)
+        check_container_version(container_name, "7")
