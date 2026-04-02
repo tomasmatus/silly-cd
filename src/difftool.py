@@ -1,21 +1,24 @@
 import logging
 import shutil
-from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
 
 class ModificationStatus(Enum):
     ADDED = "ADDED"
     MODIFIED = "MODIFIED"
     DELETED = "DELETED"
 
+
 @dataclass
 class DeploymentStatus:
     path: Path
     status: ModificationStatus
     service_name: str | None
+
 
 class DiffTool:
     desired_dir: Path
@@ -44,9 +47,11 @@ class DiffTool:
         """
         return file.is_dir() and not file.name.startswith(".")
 
-    def get_service_name(self, dir: Path, is_deleted: bool = False) -> str | None:
+    def get_service_name(self, service_dir: Path, *, is_deleted: bool = False) -> str | None:
         # dir is relative to self.desired_dir
-        full_path = self.desired_dir / dir if is_deleted is False else self.deployed_dir / dir
+        full_path = self.desired_dir / service_dir if is_deleted is False else self.deployed_dir / service_dir
+        print("Basedir:", service_dir)
+        print("FULL PATH:", full_path)
         for file in full_path.iterdir():
             if file.is_file() and file.suffix == ".kube":
                 return file.stem + ".service"
@@ -55,13 +60,15 @@ class DiffTool:
 
     def _check_modification(self, dirs: set[Path]) -> list[DeploymentStatus]:
         result: list[DeploymentStatus] = []
-        for dir in dirs:
-            desired_subdir = self.desired_dir / dir
-            deployed_subdir = self.deployed_dir / dir
+        for d in dirs:
+            desired_subdir = self.desired_dir / d
+            deployed_subdir = self.deployed_dir / d
 
             # Get all files recursively in both subdirectories (using relative paths)
-            desired_files = {f.relative_to(desired_subdir) for f in desired_subdir.rglob('*') if self._file_condition(f)}
-            deployed_files = {f.relative_to(deployed_subdir) for f in deployed_subdir.rglob('*') if self._file_condition(f)}
+            desired_files = {f.relative_to(desired_subdir) for f in desired_subdir.rglob('*')
+                if self._file_condition(f)}
+            deployed_files = {f.relative_to(deployed_subdir) for f in deployed_subdir.rglob('*')
+                if self._file_condition(f)}
 
             added_files = desired_files - deployed_files
             deleted_files = deployed_files - desired_files
@@ -80,7 +87,7 @@ class DiffTool:
             # Mark directory as modified if there are any changes, during commit the original subdir is deleted
             if added_files or deleted_files or modified_files:
                 # store the relative path
-                result.append(DeploymentStatus(dir, ModificationStatus.MODIFIED, self.get_service_name(desired_subdir)))
+                result.append(DeploymentStatus(d, ModificationStatus.MODIFIED, self.get_service_name(d)))
 
         return result
 
@@ -88,15 +95,19 @@ class DiffTool:
         """
             List modifications on top level subdirectories in deployed state
         """
-        desired_subdirs = set(f.relative_to(self.desired_dir) for f in self.desired_dir.iterdir() if self._dir_condition(f))
-        deployed_subdirs = set(f.relative_to(self.deployed_dir) for f in self.deployed_dir.iterdir() if self._dir_condition(f))
+        desired_subdirs = {f.relative_to(self.desired_dir) for f in self.desired_dir.iterdir()
+            if self._dir_condition(f)}
+        deployed_subdirs = {f.relative_to(self.deployed_dir) for f in self.deployed_dir.iterdir()
+            if self._dir_condition(f)}
 
         deleted_dirs = deployed_subdirs - desired_subdirs
         added_dirs = desired_subdirs - deployed_subdirs
         other_dirs = desired_subdirs.intersection(deployed_subdirs)
 
-        dir_status = [DeploymentStatus(dir, ModificationStatus.DELETED, self.get_service_name(dir, is_deleted=True)) for dir in deleted_dirs]
-        dir_status.extend([DeploymentStatus(dir, ModificationStatus.ADDED, self.get_service_name(dir)) for dir in added_dirs])
+        dir_status = [DeploymentStatus(del_dir, ModificationStatus.DELETED,
+                                       self.get_service_name(del_dir, is_deleted=True)) for del_dir in deleted_dirs]
+        dir_status.extend([DeploymentStatus(added_dir, ModificationStatus.ADDED,
+                                            self.get_service_name(added_dir)) for added_dir in added_dirs])
         dir_status.extend(self._check_modification(other_dirs))
 
         return dir_status
@@ -114,7 +125,7 @@ class DiffTool:
                 dst_dir = self.deployed_dir / dir_status.path
 
                 # Delete the current deployed dir and replace it with a new one
-                logger.info(f"Copying {src_dir} to {dst_dir}")
+                logger.info("Copying %s to %s", src_dir, dst_dir)
                 if dst_dir.exists():
                     shutil.rmtree(dst_dir)
 
@@ -123,5 +134,5 @@ class DiffTool:
             elif dir_status.status == ModificationStatus.DELETED:
                 dst_dir = self.deployed_dir / dir_status.path
                 if dst_dir.exists():
-                    logger.info(f"Removing {dst_dir}")
+                    logger.info("Removing %s", dst_dir)
                     shutil.rmtree(dst_dir)

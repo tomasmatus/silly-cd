@@ -5,6 +5,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+
 class GitForge:
     def __init__(self, work_dir: Path):
         if not work_dir.is_dir():
@@ -28,8 +29,8 @@ class GitForge:
             subprocess.CalledProcessError: If the git command fails
         """
 
-        cmd = ["git"] + list(args)
-        logging.debug(f"Running git command: {cmd}")
+        cmd = ["git", *list(args)]
+        logging.debug("Running git command: %s", cmd)
 
         result = subprocess.run(
             cmd,

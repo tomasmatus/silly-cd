@@ -1,7 +1,8 @@
 import shutil
-import pytest
 import subprocess
 from pathlib import Path
+
+import pytest
 
 from src.difftool import DeploymentStatus, DiffTool, ModificationStatus
 
@@ -37,15 +38,15 @@ class TestDiff:
     def delete_file(file_path: Path) -> None:
         file_path.unlink()
 
-    def add_service(self, dir: Path, service_name: str) -> None:
-        service_dir = dir / service_name
+    def add_service(self, basedir: Path, service_name: str) -> None:
+        service_dir = basedir / service_name
         service_dir.mkdir(parents=True, exist_ok=True)
-        self.write_file(service_dir  / f"{service_name}-kube.yaml", SAMPLE_FILE_CONTENT)
-        self.write_file(service_dir  / f"{service_name}-kube.kube", SAMPLE_FILE_CONTENT)
+        self.write_file(service_dir / f"{service_name}-kube.yaml", SAMPLE_FILE_CONTENT)
+        self.write_file(service_dir / f"{service_name}-kube.kube", SAMPLE_FILE_CONTENT)
 
     @staticmethod
-    def delete_service(dir: Path, service_name: str) -> None:
-        shutil.rmtree(dir / service_name)
+    def delete_service(basedir: Path, service_name: str) -> None:
+        shutil.rmtree(basedir / service_name)
 
     @staticmethod
     def commit_and_assert_zero(changes: list[DeploymentStatus], diff: DiffTool) -> None:

@@ -1,10 +1,11 @@
 import logging
 import shutil
-import time
-import pytest
 import subprocess
+import time
 from pathlib import Path
 from typing import Callable, Generator, TypeVar
+
+import pytest
 
 from src.podman_cd import PodmanCD
 from src.systemctl import Systemctl
@@ -13,6 +14,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 TEST_CONTAINER_IMAGE = "localhost/alpine:6"
 ALT_TEST_CONTAINER_IMAGE = "localhost/alpine:7"
+
 
 def kube_yaml_content(name: str, *, image_name: str = TEST_CONTAINER_IMAGE) -> str:
     return f"""apiVersion: apps/v1
@@ -34,6 +36,7 @@ spec:
         command: ["sleep", "infinity"]
 """
 
+
 def kube_file_content(name: str) -> str:
     return f"""[Kube]
 Yaml={name}.yaml
@@ -42,7 +45,9 @@ Yaml={name}.yaml
 WantedBy=default.target
 """
 
+
 type ServiceFactory = Callable[[Path, str], None]
+
 
 class Error(Exception):
     def __init__(self, msg: str) -> None:
@@ -51,11 +56,14 @@ class Error(Exception):
     def __str__(self) -> str:
         return self.msg
 
+
 _T = TypeVar("_T")
+
 
 def run_subprocess(cmd: list[str]) -> tuple[str, int]:
     ret = subprocess.run(cmd, capture_output=True, text=True, check=True)
     return (ret.stdout.strip(), ret.returncode)
+
 
 def wait(func: Callable[[], _T | None], *, timeout: int = 5, err_msg: str | None = None) -> _T:
     """
@@ -76,6 +84,7 @@ def wait(func: Callable[[], _T | None], *, timeout: int = 5, err_msg: str | None
 
     raise Error(err_msg or "Time out waiting for predicate to become true")
 
+
 def wait_service_active(name: str, systemctl: Systemctl, *, timeout: int = 5) -> None:
     """
         Wait until the given service is active
@@ -93,6 +102,7 @@ def wait_service_active(name: str, systemctl: Systemctl, *, timeout: int = 5) ->
     wait(lambda: systemctl.is_active(name), timeout=timeout,
          err_msg=f"Service {name} did not become active")
 
+
 def wait_container_running(name: str, *, timeout: int = 5) -> None:
     def _check_podman_ps():
         out, _ = run_subprocess(["podman", "ps", "--format", "{{.Names}}"])
@@ -101,6 +111,7 @@ def wait_container_running(name: str, *, timeout: int = 5) -> None:
 
     wait(_check_podman_ps, err_msg=f"Container {name} did not start running", timeout=timeout)
 
+
 def wait_container_doesnt_exist(name: str, *, timeout: int = 5) -> None:
     def _check_podman_ps():
         out, _ = run_subprocess(["podman", "ps", "-a", "--format", "{{.Names}}"])
@@ -108,6 +119,7 @@ def wait_container_doesnt_exist(name: str, *, timeout: int = 5) -> None:
         return name not in out.splitlines()
 
     wait(_check_podman_ps, err_msg=f"Container {name} is still present!", timeout=timeout)
+
 
 def check_container_version(name: str, expected_ver: str) -> None:
     ver, _ = run_subprocess(["podman", "inspect", name, "--format", "{{.ImageName}}"])
@@ -124,16 +136,17 @@ def prepare_test_image():
     run_subprocess(["podman", "tag", "docker.io/library/alpine:latest", TEST_CONTAINER_IMAGE])
     run_subprocess(["podman", "tag", "docker.io/library/alpine:latest", ALT_TEST_CONTAINER_IMAGE])
 
+
 class TestPodmanCD:
     deployed_dir: Path = Path("~/.config/containers/systemd/pytests_deployed").expanduser()
     systemctl: Systemctl = Systemctl(user_mode=True)
 
     @staticmethod
-    def remove_service(dir: Path, name: str) -> None:
+    def remove_service(basedir: Path, name: str) -> None:
         """
             Remove subdirectory of a given service from desired_dir
         """
-        shutil.rmtree(dir / name)
+        shutil.rmtree(basedir / name)
 
     @pytest.fixture(autouse=True)
     def setup_deployed_dir(self):
@@ -167,9 +180,9 @@ class TestPodmanCD:
             Fixture to automatically clean up created services
         """
 
-        def _add_service(dir: Path, name: str) -> None:
+        def _add_service(basedir: Path, name: str) -> None:
             # create service directory and files
-            service_dir = dir / name
+            service_dir = basedir / name
             service_dir.mkdir()
 
             yaml_file = service_dir / f"{name}.yaml"
@@ -195,7 +208,7 @@ class TestPodmanCD:
         file.write_text(new_conent)
 
     def test_add_remove_container(self, desired_dir: Path, add_service: ServiceFactory) -> None:
-        podman_cd = PodmanCD(str(desired_dir), str(self.deployed_dir), True)
+        podman_cd = PodmanCD(str(desired_dir), str(self.deployed_dir), user_mode=True)
 
         add_service(desired_dir, "fancy")
         podman_cd.run_update()
@@ -219,7 +232,7 @@ class TestPodmanCD:
         wait_container_doesnt_exist("fanciest-pod-fanciest", timeout=20)
 
     def test_add_modify_container(self, desired_dir: Path, add_service: ServiceFactory) -> None:
-        podman_cd = PodmanCD(str(desired_dir), str(self.deployed_dir), True)
+        podman_cd = PodmanCD(str(desired_dir), str(self.deployed_dir), user_mode=True)
 
         container_name = "jellyfin-pod-jellyfin"
         add_service(desired_dir, "jellyfin")
