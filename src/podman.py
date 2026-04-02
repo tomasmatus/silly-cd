@@ -21,8 +21,8 @@ class Podman:
         Raises:
             subprocess.CalledProcessError: If the podman command fails
         """
-        cmd = ["podman"] + list(args)
-        logger.debug(f"Running podman command: {cmd}")
+        cmd = ["podman", *list(args)]
+        logger.debug("Running podman command: %s", cmd)
 
         result = subprocess.run(
             cmd,

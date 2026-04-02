@@ -5,7 +5,7 @@ logger = logging.getLogger(__name__)
 
 
 class Systemctl:
-    def __init__(self, user_mode: bool = False):
+    def __init__(self, *, user_mode: bool = False):
         """
         Initialize Systemctl wrapper.
 
@@ -35,7 +35,7 @@ class Systemctl:
             cmd.append("--user")
 
         cmd.extend(list(args))
-        logger.debug(f"Running systemctl command: {cmd}")
+        logger.debug("Running systemctl command: %s", cmd)
 
         result = subprocess.run(
             cmd,
@@ -46,46 +46,46 @@ class Systemctl:
 
         return result.stdout.strip()
 
-    def start(self, service: str, user: bool | None = None) -> str:
+    def start(self, service: str, *, user: bool | None = None) -> str:
         """Start a service."""
         return self.run_systemctl_command("start", service, user=user)
 
-    def stop(self, service: str, user: bool | None = None) -> str:
+    def stop(self, service: str, *, user: bool | None = None) -> str:
         """Stop a service."""
         return self.run_systemctl_command("stop", service, user=user)
 
-    def restart(self, service: str, user: bool | None = None) -> str:
+    def restart(self, service: str, *, user: bool | None = None) -> str:
         """Restart a service."""
         return self.run_systemctl_command("restart", service, user=user)
 
-    def reload(self, service: str, user: bool | None = None) -> str:
+    def reload(self, service: str, *, user: bool | None = None) -> str:
         """Reload a service configuration."""
         return self.run_systemctl_command("reload", service, user=user)
 
-    def enable(self, service: str, user: bool | None = None) -> str:
+    def enable(self, service: str, *, user: bool | None = None) -> str:
         """Enable a service to start on boot."""
         return self.run_systemctl_command("enable", service, user=user)
 
-    def disable(self, service: str, user: bool | None = None) -> str:
+    def disable(self, service: str, *, user: bool | None = None) -> str:
         """Disable a service from starting on boot."""
         return self.run_systemctl_command("disable", service, user=user)
 
-    def status(self, service: str, user: bool | None = None) -> str:
+    def status(self, service: str, *, user: bool | None = None) -> str:
         """Get the status of a service."""
         return self.run_systemctl_command("status", service, user=user)
 
-    def is_active(self, service: str, user: bool | None = None) -> bool:
+    def is_active(self, service: str, *, user: bool | None = None) -> bool:
         """Check if a service is active."""
         ret = self.run_systemctl_command("is-active", service, user=user)
 
         return ret == "active"
 
-    def is_enabled(self, service: str, user: bool | None = None) -> bool:
+    def is_enabled(self, service: str, *, user: bool | None = None) -> bool:
         """Check if a service is enabled."""
         ret = self.run_systemctl_command("is-enabled", service, user=user)
 
         return ret == "enabled"
 
-    def daemon_reload(self, user: bool | None = None) -> str:
+    def daemon_reload(self, *, user: bool | None = None) -> str:
         """Reload systemd manager configuration."""
         return self.run_systemctl_command("daemon-reload", user=user)
