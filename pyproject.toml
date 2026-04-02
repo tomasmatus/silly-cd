@@ -1,2 +1,41 @@
 [tool.pytest.ini_options]
 pythonpath = ["."]
+
+[tool.ruff]
+exclude = [
+    ".git/",
+    ".github/"
+]
+line-length = 120
+preview = true
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.ruff.lint]
+select = [
+    "A",       # flake8-builtins
+    "B",       # flake8-bugbear
+    "C4",      # flake8-comprehensions
+    "D300",    # pydocstyle: Forbid ''' in docstrings
+    "DTZ",     # flake8-datetimez
+    "E",       # pycodestyle
+    "EXE",     # flake8-executable
+    "F",       # pyflakes
+    "FBT",     # flake8-boolean-trap
+    "G",       # flake8-logging-format
+    "I",       # isort
+    "ICN",     # flake8-import-conventions
+    "ISC",     # flake8-implicit-str-concat
+    "PIE",     # flake8-pie
+    "PLE",     # pylint errors
+    "PGH",     # pygrep-hooks
+    "PT",      # flake8-pytest-style
+    "RSE",     # flake8-raise
+    "RUF",     # ruff rules
+    "T10",     # flake8-debugger
+    "TC",      # flake8-type-checking
+    "UP032",   # f-string
+    "W",       # warnings (mostly whitespace)
+    "YTT",     # flake8-2020
+]
